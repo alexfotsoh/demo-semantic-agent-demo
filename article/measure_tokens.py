@@ -60,34 +60,48 @@ def text_tokens(obj) -> int:
 # --------------------------------------------------------------- analyse
 
 def analyse(path: Path) -> dict:
-    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
-    resultat = {"fichier": path.name, "metriques": {}, "modeles": {}}
+    doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    r = {"fichier": path.name, "metriques": {}, "modeles": {}, "spec": "?"}
 
-    for m in doc.get("metrics", []) or []:
-        resultat["metriques"][m["name"]] = {
-            "total": tokens_of(m),
-            "redige": text_tokens(m),
-        }
+    # ---- forme ancienne : cles a la racine
+    racine_sm = doc.get("semantic_models") or []
+    racine_me = doc.get("metrics") or []
+    if racine_sm or racine_me:
+        r["spec"] = "racine"
+        for m in racine_me:
+            r["metriques"][m["name"]] = {"total": tokens_of(m), "redige": text_tokens(m)}
+        for sm in racine_sm:
+            r["modeles"][sm["name"]] = {"total": tokens_of(sm), "redige": text_tokens(sm)}
 
-    for sm in doc.get("semantic_models", []) or []:
-        resultat["modeles"][sm["name"]] = {
-            "total": tokens_of(sm),
-            "redige": text_tokens(sm),
-        }
+    # ---- forme imbriquee : sous models:
+    for mdl in doc.get("models") or []:
+        if not isinstance(mdl, dict):
+            continue
+        nom = mdl.get("name", "?")
+        for me in mdl.get("metrics") or []:
+            r["spec"] = "imbriquee"
+            r["metriques"][me["name"]] = {"total": tokens_of(me), "redige": text_tokens(me)}
+        if "semantic_model" in mdl or mdl.get("columns"):
+            r["spec"] = "imbriquee"
+            sans_metriques = {k: v for k, v in mdl.items() if k != "metrics"}
+            r["modeles"][nom] = {
+                "total": tokens_of(sans_metriques),
+                "redige": text_tokens(sans_metriques),
+            }
 
-    resultat["total"] = (
-        sum(v["total"] for v in resultat["metriques"].values())
-        + sum(v["total"] for v in resultat["modeles"].values())
+    r["total"] = (
+        sum(v["total"] for v in r["metriques"].values())
+        + sum(v["total"] for v in r["modeles"].values())
     )
-    resultat["redige"] = (
-        sum(v["redige"] for v in resultat["metriques"].values())
-        + sum(v["redige"] for v in resultat["modeles"].values())
+    r["redige"] = (
+        sum(v["redige"] for v in r["metriques"].values())
+        + sum(v["redige"] for v in r["modeles"].values())
     )
-    return resultat
+    return r
 
 
 def afficher(r: dict) -> None:
-    print(f"\n=== {r['fichier']} ===")
+    print(f"\n=== {r['fichier']}  (spec : {r['spec']}) ===")
     if r["metriques"]:
         print("\nMétriques           total   dont rédigé")
         for nom, v in r["metriques"].items():
@@ -96,6 +110,8 @@ def afficher(r: dict) -> None:
         print("\nModèles sémantiques total   dont rédigé")
         for nom, v in r["modeles"].items():
             print(f"  {nom:<18} {v['total']:>5}   {v['redige']:>5}")
+    if not r["metriques"] and not r["modeles"]:
+        print("\n  Aucun modele semantique ni metrique reconnu dans ce fichier.")
     print(f"\n  TOTAL              {r['total']:>5}   {r['redige']:>5}")
 
 
