@@ -1,0 +1,185 @@
+version: 2
+
+# ---------------------------------------------------------------------------
+# POINT ZÉRO
+#
+# Modèle sémantique écrit comme on l'écrit normalement : descriptions courtes,
+# labels présents, conventions métier implémentées dans le SQL mais non
+# formulées. Il fonctionne. Il alimente des rapports mensuels sans poser de
+# problème, parce que l'utilisateur choisit sa métrique dans une liste et sait
+# de quoi il parle.
+#
+# C'est cette version qui sert de point de départ à l'article. Elle n'est pas
+# à corriger avant les tests.
+# ---------------------------------------------------------------------------
+
+semantic_models:
+
+  - name: factures
+    description: Factures émises aux clients.
+    model: ref('fct_factures')
+    defaults:
+      agg_time_dimension: date_facturation
+
+    entities:
+      - name: facture
+        type: primary
+        expr: invoice_id
+      - name: contrat
+        type: foreign
+        expr: contract_id
+
+    dimensions:
+      # Deux dimensions temporelles coexistent, sans que rien n'indique
+      # laquelle porte la convention de rattachement.
+      - name: date_facturation
+        description: Période couverte par la facture.
+        type: time
+        expr: period_start
+        type_params:
+          time_granularity: day
+
+      - name: date_emission
+        description: Date d'émission de la facture.
+        type: time
+        expr: issue_date
+        type_params:
+          time_granularity: day
+
+      - name: type_facture
+        description: Type de facture.
+        type: categorical
+        expr: invoice_type
+
+      - name: offre
+        description: Offre souscrite.
+        type: categorical
+        expr: offer_code
+
+      - name: region
+        description: Région du contrat.
+        type: categorical
+
+    measures:
+      - name: montant_ht
+        description: Montant hors taxes.
+        agg: sum
+        expr: amount_ht
+
+      - name: montant_hors_avoirs
+        description: Montant hors taxes, avoirs exclus.
+        agg: sum
+        expr: case when invoice_type = 'AVOIR' then 0 else amount_ht end
+
+  - name: releves
+    description: Relevés de consommation.
+    model: ref('fct_releves')
+    defaults:
+      agg_time_dimension: date_releve
+
+    entities:
+      - name: releve
+        type: primary
+        expr: reading_id
+      - name: contrat
+        type: foreign
+        expr: contract_id
+
+    dimensions:
+      - name: date_releve
+        description: Date du relevé.
+        type: time
+        expr: reading_date
+        type_params:
+          time_granularity: day
+
+      - name: type_releve
+        description: Type de relevé.
+        type: categorical
+        expr: reading_type
+
+      - name: offre
+        description: Offre souscrite.
+        type: categorical
+        expr: offer_code
+
+      - name: region
+        description: Région du contrat.
+        type: categorical
+
+    measures:
+      # Additionne relevés réels et estimés sans le dire.
+      - name: kwh_releves
+        description: Consommation relevée.
+        agg: sum
+        expr: kwh
+
+  - name: contrats
+    description: Contrats clients.
+    model: ref('dim_contrats')
+    defaults:
+      agg_time_dimension: date_debut
+
+    entities:
+      - name: contrat
+        type: primary
+        expr: contract_id
+
+    dimensions:
+      - name: date_debut
+        description: Date de début du contrat.
+        type: time
+        expr: start_date
+        type_params:
+          time_granularity: day
+
+      - name: offre
+        description: Offre souscrite.
+        type: categorical
+        expr: offer_code
+
+      - name: region
+        description: Région du contrat.
+        type: categorical
+
+    measures:
+      # Ne dit rien du traitement d'une résiliation en cours de mois.
+      - name: nb_contrats
+        description: Nombre de contrats.
+        agg: count_distinct
+        expr: contract_id
+
+
+metrics:
+
+  - name: revenue_gross
+    label: Chiffre d'affaires brut
+    description: Chiffre d'affaires hors taxes.
+    type: simple
+    type_params:
+      measure: montant_hors_avoirs
+
+  - name: revenue_net
+    label: Chiffre d'affaires net
+    description: Chiffre d'affaires hors taxes, après avoirs.
+    type: simple
+    type_params:
+      measure: montant_ht
+    # Les contrats internes sont exclus. Le filtre est là, la règle n'est
+    # écrite nulle part ailleurs.
+    filter: |
+      {{ Dimension('contrat__is_internal') }} = false
+
+  - name: consumption_kwh
+    label: Consommation
+    description: Consommation en kWh.
+    type: simple
+    type_params:
+      measure: kwh_releves
+
+  - name: active_contracts
+    label: Contrats actifs
+    description: Nombre de contrats actifs.
+    type: simple
+    type_params:
+      measure: nb_contrats

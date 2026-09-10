@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: raw_energie
+    description: Tables brutes de facturation énergie (jeu synthétique).
+    database: DEMO_ENERGIE
+    schema: RAW
+    tables:
+      - name: contrats
+      - name: releves
+      - name: factures
+      - name: lignes_facture
