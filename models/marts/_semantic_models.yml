@@ -1,18 +1,5 @@
 version: 2
 
-# ---------------------------------------------------------------------------
-# POINT ZÉRO
-#
-# Modèle sémantique écrit comme on l'écrit normalement : descriptions courtes,
-# labels présents, conventions métier implémentées dans le SQL mais non
-# formulées. Il fonctionne. Il alimente des rapports mensuels sans poser de
-# problème, parce que l'utilisateur choisit sa métrique dans une liste et sait
-# de quoi il parle.
-#
-# C'est cette version qui sert de point de départ à l'article. Elle n'est pas
-# à corriger avant les tests.
-# ---------------------------------------------------------------------------
-
 models:
   - name: fct_factures
     semantic_model:
@@ -29,8 +16,6 @@ models:
         entity:
           type: foreign
           name: contrat
-      # Deux dimensions temporelles coexistent, sans que rien n'indique
-      # laquelle porte la convention de rattachement.
       - name: period_start
         dimension:
           type: time
@@ -64,8 +49,6 @@ models:
         label: Chiffre d'affaires net
         description: Chiffre d'affaires hors taxes, après avoirs.
         type: simple
-        # Les contrats internes sont exclus. Le filtre est là, la règle n'est
-        # écrite nulle part ailleurs.
         filter: |
           {{ Dimension('contrat__is_internal') }} = false
         agg: sum
@@ -103,7 +86,6 @@ models:
         dimension:
           type: categorical
     metrics:
-      # Additionne relevés réels et estimés sans le dire.
       - name: consumption_kwh
         label: Consommation
         description: Consommation en kWh.
@@ -127,8 +109,6 @@ models:
           type: time
           name: date_debut
         granularity: day
-      # Déclarée ici, sur la dimension qui porte l'information.
-      # C'est ce que référence le filtre de revenue_net.
       - name: is_internal
         dimension:
           type: categorical
@@ -139,8 +119,28 @@ models:
       - name: region
         dimension:
           type: categorical
+
+  - name: fct_contrats_mois
+    semantic_model:
+      enabled: true
+      name: fct_contrats_mois
+    description: Contrats actifs par mois.
+    agg_time_dimension: mois_activite
+    columns:
+      - name: contract_month_id
+        entity:
+          type: primary
+          name: contrat_mois
+      - name: contract_id
+        entity:
+          type: foreign
+          name: contrat
+      - name: mois
+        dimension:
+          type: time
+          name: mois_activite
+        granularity: month
     metrics:
-      # Ne dit rien du traitement d'une résiliation en cours de mois.
       - name: active_contracts
         label: Contrats actifs
         description: Nombre de contrats actifs.
