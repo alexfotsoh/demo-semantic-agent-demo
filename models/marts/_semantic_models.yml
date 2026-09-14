@@ -95,7 +95,15 @@ models:
     metrics:
       - name: consumption_kwh
         label: Consommation
-        description: Consommation en kWh.
+        description: >
+          Consommation en kWh, mesurée par relevé. Un relevé couvre un mois.
+          Attention : le total additionne les relevés réels et les relevés
+          estimés, qui représentent environ 45 % du volume. Pour ne retenir
+          que la consommation mesurée, filtrer sur la dimension type_releve
+          (valeur REEL). La consommation est fortement saisonnière : un mois
+          d'hiver peut dépasser de 70 % la moyenne mensuelle annuelle, un mois
+          d'été lui être inférieur de moitié. Comparer un mois à un douzième
+          d'un total annuel produit donc un résultat trompeur.
         type: simple
         agg: sum
         expr: kwh
