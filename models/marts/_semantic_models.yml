@@ -47,7 +47,14 @@ models:
 
       - name: revenue_net
         label: Chiffre d'affaires net
-        description: Chiffre d'affaires hors taxes, après avoirs.
+        description: >
+          Chiffre d'affaires hors taxes, en euros, après déduction des avoirs.
+          Les contrats internes sont exclus. Par défaut, une facture est rattachée
+          au mois où commence la période qu'elle couvre (date_facturation), et non
+          au mois où elle a été émise : une facture émise en février pour la
+          consommation de janvier compte en janvier. Pour raisonner sur les
+          montants émis, utiliser la dimension date_emission ; les deux lectures
+          donnent des totaux annuels différents.
         type: simple
         filter: |
           {{ Dimension('contrat__is_internal') }} = false
